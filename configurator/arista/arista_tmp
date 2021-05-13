@@ -1,0 +1,129 @@
+alias si6b show ipv6 bgp
+alias si6bcl show ipv6 bgp community-list
+alias si6bn show ipv6 bgp neighbors
+alias si6bs show ipv6 bgp summary
+alias si6p show ipv6 prefix-list
+alias si6r show ipv6 route
+alias si6rs show ipv6 route summary
+alias sial show ip access-list
+alias sib show ip bgp
+alias sibcl show ip bgp community-list
+alias sibn show ip bgp neighbors
+alias sibs show ip bgp summary
+alias sio show ip ospf
+alias siodds show ip ospf database database-summary
+alias sip show ip prefix-list
+alias sir show ip route
+alias sirs show ip route summary
+alias srm show route-map
+!
+transceiver qsfp default-mode 4x10G
+!
+errdisable recovery cause xcvr-unsupported
+!
+logging buffered 32768
+logging host logger.zt.hu 5547
+logging source-interface Loopback0
+!
+hostname $routerHostname
+ip domain lookup source-interface Loopback0
+ip name-server vrf default 185.106.112.170
+ip name-server vrf default 185.106.112.70
+dns domain net.zt.hu
+!
+ntp server 172.16.16.123
+ntp server time.zt.hu prefer source Loopback0
+!
+radius-server retransmit 0
+radius-server host 172.16.5.50 key 7 097547264D22112804282B2339
+radius-server host 172.16.5.100 key 7 097547264D22112804282B2339
+!
+aaa group server radius ZTRADIUS
+   server 172.16.5.50
+   server 172.16.5.100
+!
+snmp-server contact noc@zt.hu | +3630 257 3400
+snmp-server location $routerSNMPSLoc
+snmp-server local-interface Loopback0
+snmp-server community imperator ro snmp
+snmp-server  user ospf ospf  v3
+snmp-server  group  ospf v3 noauth
+
+
+!
+spanning-tree mode mstp
+!
+aaa authentication login default local group ZTRADIUS
+aaa authentication login console local group ZTRADIUS
+aaa authorization exec default local group ZTRADIUS
+aaa accounting exec console start-stop logging
+aaa accounting commands all console start-stop logging
+aaa accounting exec default start-stop logging
+aaa accounting commands all default start-stop logging
+!
+enable password sha512 $6$aNF25drxmn3S3o5e$dCASCpeuB.w.JBNOcGzt8n6s2vPkCOo1vQB8fZCjWhE3EpvnBf8XwViX4RjB9ByoxxmHUzM5syn1k0pRgB2JB/
+no aaa root
+!
+username admin privilege 15 role network-admin secret sha512 $6$cfl.KbQ0Ol0IF9Sf$rFdzzxSstlV28D9WVUCN9UnxZTTGYYupf9qpv4gUWxITxhTOOCb/xueQi.YUdslW6F7LHZ40OcYm6EmquT/jN.
+!
+clock timezone Europe/Budapest
+!
+vlan 100
+!
+vlan 101
+   private-vlan isolated primary vlan 100
+!
+vrf instance mgmt
+!
+interface Ethernet 1
+   description powermonitor
+   switchport access vlan 101
+   switchport pvlan mapping 100
+!
+interface Ethernet 2
+   description provider
+   switchport access vlan 100
+!
+
+$defaultGatewayConfig
+
+interface Loopback0
+   ip address $routerLoIp/32
+!
+
+interface Management1
+!
+interface Vlan100
+	ip address $routerBrIp
+	mtu 1658
+!
+ip access-list standard mgmt
+   10 permit 172.16.0.0/16
+   20 permit 192.168.192.0/30
+!
+ip access-list standard snmp
+   10 permit 172.16.5.0/24
+!
+ip routing
+no ip routing vrf mgmt
+!
+ip route 0.0.0.0/0 $routerGateway 120
+!
+$routerNativeOspf
+!
+ip prefix-list ospf-out seq 10 permit 100.64.0.0/11 le 32
+ip prefix-list ospf-out seq 20 permit 100.96.0.0/12 le 24
+ip prefix-list ospf-out seq 30 permit 100.112.0.0/12 le 32
+ip prefix-list ospf-out seq 900 deny 100.64.0.0/10 le 32
+ip prefix-list ospf-out seq 999 permit 0.0.0.0/0 le 32
+!
+route-map ospf-out permit 10
+   match ip address prefix-list ospf-out
+   set metric 20
+   set metric-type type-1
+!
+management ssh
+   ip access-group mgmt in
+   idle-timeout 1440
+!
+end
